@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api import reservation
+from app.api import reservation, schedule
 from app.core.config import settings
 from app.core.database import Base, engine, SessionLocal
 from app.core.dummy import create_seed_data
@@ -22,3 +22,4 @@ async def startup_event():
 
 
 app.include_router(reservation.router)
+app.include_router(schedule.router)

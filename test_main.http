@@ -17,3 +17,7 @@ Accept: application/json
 GET http://127.0.0.1:8000/reservations
 Authorization: Bearer user2
 Accept: application/json
+
+### id가 2번인 사용자의 가능한 예약 시간 조회
+GET http://localhost:8000/exam-schedules/available
+Authorization: user2
