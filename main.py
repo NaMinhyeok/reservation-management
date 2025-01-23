@@ -1,21 +1,20 @@
 from fastapi import FastAPI
 
 from app.core.config import settings
-from app.core.database import Base, engine
-from app.models import *
-
-Base.metadata.create_all(bind=engine)
+from app.core.database import Base, engine, SessionLocal
+from app.core.dummy import create_seed_data
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
 )
 
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
 
-
-@app.get("/hello/{name}")
-async def say_hello(name: str):
-    return {"message": f"Hello {name}"}
+@app.on_event("startup")
+async def startup_event():
+    Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    try:
+        create_seed_data(db)
+    finally:
+        db.close()
