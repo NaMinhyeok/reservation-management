@@ -21,3 +21,14 @@ Accept: application/json
 ### id가 2번인 사용자의 가능한 예약 시간 조회
 GET http://localhost:8000/exam-schedules/available
 Authorization: user2
+
+### 일반 사용자로 예약 생성
+POST http://localhost:8000/reservations
+Authorization: user2
+Content-Type: application/json
+
+{
+    "start_time": "2025-04-24T14:00:00",
+    "end_time": "2025-04-24T16:00:00",
+    "requested_seats": 20000
+}
