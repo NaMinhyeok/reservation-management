@@ -32,3 +32,8 @@ Content-Type: application/json
     "end_time": "2025-04-24T16:00:00",
     "requested_seats": 20000
 }
+
+### 관리자로 예약 확인
+PATCH http://localhost:8000/reservations/2/confirm
+Authorization: admin
+Content-Type: application/json
