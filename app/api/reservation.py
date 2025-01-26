@@ -10,7 +10,7 @@ from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.models import Reservation, User, ExamSchedule
 from app.models.enums import UserRole, ReservationStatus
-from app.schemas.reservation import ReservationResponse
+from app.schemas.reservation import ReservationResponse, ReservationUpdate
 
 router = APIRouter(prefix="/reservations", tags=["reservations"])
 
@@ -48,7 +48,7 @@ def create_reservation(
         db.flush()
 
     if exam_schedule.start_time <= datetime.now() + timedelta(days=3):
-        raise HTTPException(status_code=400, detail="Reservations must be made at least 3 days before the exam")
+        raise HTTPException(status_code=400, detail="예약은 시험 3일 전까지만 가능합니다.")
 
     confirmed_seats = sum(
         r.requested_seats
@@ -57,7 +57,7 @@ def create_reservation(
     )
 
     if confirmed_seats + request.requested_seats > exam_schedule.max_seats:
-        raise HTTPException(status_code=400, detail="Not enough available seats")
+        raise HTTPException(status_code=400, detail="충분한 자리가 없습니다.")
 
     new_reservation = Reservation(
         user_id=current_user.id,
@@ -87,13 +87,12 @@ async def confirm_reservation(
     current_user: User = Depends(get_current_user)
 ):
     if current_user.role != UserRole.ADMIN:
-        raise HTTPException(status_code=403, detail="Only admins can confirm reservations")
+        raise HTTPException(status_code=403, detail="관리자만 예약을 확정할 수 있습니다.")
 
     reservation = db.query(Reservation).get(reservation_id)
     if not reservation:
-        raise HTTPException(status_code=404, detail="Reservation not found")
+        raise HTTPException(status_code=404, detail="예약을 찾을 수 없습니다.")
 
-    # 확정된(CONFIRMED) 예약만 카운트
     total_confirmed_seats = db.query(func.sum(Reservation.requested_seats))\
         .filter(
             Reservation.exam_id == reservation.exam_id,
@@ -103,11 +102,60 @@ async def confirm_reservation(
     if total_confirmed_seats + reservation.requested_seats > reservation.exam_schedule.max_seats:
         raise HTTPException(
             status_code=400,
-            detail=f"Exceeds maximum capacity. Current confirmed: {total_confirmed_seats}, Requested: {reservation.requested_seats}"
+            detail=f"예약인원 최대치를 초과했습니다. 현재 확정인원: {total_confirmed_seats}, 요청인원: {reservation.requested_seats}"
         )
 
     reservation.status = ReservationStatus.CONFIRMED
     db.commit()
     db.refresh(reservation)
 
+    return reservation
+
+
+@router.patch("/{reservation_id}", response_model=ReservationResponse)
+async def update_reservation(
+        reservation_id: int,
+        update_data: ReservationUpdate,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    reservation = db.query(Reservation).join(ExamSchedule).get(reservation_id)
+    if not reservation:
+        raise HTTPException(status_code=404, detail="예약이 존재하지 않습니다.")
+
+    # 관리자가 아닌 경우만 체크
+    if current_user.role != UserRole.ADMIN:
+        if reservation.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="다른 사용자의 예약을 변경할 수 없습니다.")
+        if reservation.status == ReservationStatus.CONFIRMED:
+            raise HTTPException(status_code=400, detail="확정된 예약은 변경할 수 없습니다.")
+        if update_data.start_time and update_data.start_time < datetime.now() + timedelta(days=3):
+            raise HTTPException(status_code=400, detail="시험 3일 전까지만 예약이 변경 가능합니다.")
+
+    if update_data.start_time or update_data.end_time:
+        new_start = update_data.start_time or reservation.exam_schedule.start_time
+        new_end = update_data.end_time or reservation.exam_schedule.end_time
+
+        if current_user.role != UserRole.ADMIN:  # 관리자가 아닌 경우만 좌석 체크
+            overlapping_seats = db.query(func.sum(Reservation.requested_seats)) \
+                                    .join(ExamSchedule) \
+                                    .filter(
+                ExamSchedule.start_time < new_end,
+                ExamSchedule.end_time > new_start,
+                Reservation.status == ReservationStatus.CONFIRMED,
+                Reservation.id != reservation_id
+            ).scalar() or 0
+
+            new_seats = update_data.requested_seats or reservation.requested_seats
+            if overlapping_seats + new_seats > reservation.exam_schedule.max_seats:
+                raise HTTPException(status_code=400, detail="해당 시간에 충분한 자리가 없습니다.")
+
+        reservation.exam_schedule.start_time = new_start
+        reservation.exam_schedule.end_time = new_end
+
+    if update_data.requested_seats:
+        reservation.requested_seats = update_data.requested_seats
+
+    db.commit()
+    db.refresh(reservation)
     return reservation

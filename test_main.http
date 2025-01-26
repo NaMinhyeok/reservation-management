@@ -37,3 +37,12 @@ Content-Type: application/json
 PATCH http://localhost:8000/reservations/2/confirm
 Authorization: admin
 Content-Type: application/json
+
+### 사용자가 본인의 미확정 예약 수정
+PATCH http://localhost:8000/reservations/4
+Authorization: user2
+Content-Type: application/json
+
+{
+    "requested_seats": 10000
+}
