@@ -159,3 +159,22 @@ async def update_reservation(
     db.commit()
     db.refresh(reservation)
     return reservation
+
+@router.delete("/{reservation_id}", status_code=204)
+async def delete_reservation(
+       reservation_id: int,
+       db: Session = Depends(get_db),
+       current_user: User = Depends(get_current_user)
+):
+   reservation = db.query(Reservation).get(reservation_id)
+   if not reservation:
+       raise HTTPException(status_code=404, detail="예약이 존재하지 않습니다.")
+
+   if current_user.role != UserRole.ADMIN:
+       if reservation.user_id != current_user.id:
+           raise HTTPException(status_code=403, detail="다른 사용자의 예약을 삭제할 수 없습니다.")
+       if reservation.status == ReservationStatus.CONFIRMED:
+           raise HTTPException(status_code=400, detail="확정된 예약은 삭제할 수 없습니다.")
+
+   db.delete(reservation)
+   db.commit()

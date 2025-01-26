@@ -46,3 +46,11 @@ Content-Type: application/json
 {
     "requested_seats": 10000
 }
+
+### 예약 삭제 - 관리자
+DELETE http://localhost:8000/reservations/1
+Authorization: admin
+
+### 예약 삭제 - 일반 사용자
+DELETE http://localhost:8000/reservations/1
+Authorization: user1
