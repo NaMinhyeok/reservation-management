@@ -4,14 +4,12 @@ from typing import Type, Optional
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.transaction import BaseRepository
 from app.models import ExamSchedule, Reservation
 from app.models.enums import ReservationStatus
 
 
-class ReservationRepository:
-    def __init__(self, db: Session):
-        self.db = db
-
+class ReservationRepository(BaseRepository):
     def find_exam_schedule(self, start_time: datetime, end_time: datetime) -> Optional[Type[ExamSchedule]]:
         return (
             self.db.query(ExamSchedule)
@@ -35,7 +33,7 @@ class ReservationRepository:
                 .scalar() or 0
         )
 
-    def get_reservation_by_id(self, reservation_id: int) -> Reservation:
+    def get_reservation_by_id(self, reservation_id: int) -> Optional[Reservation]:
         return self.db.query(Reservation).get(reservation_id)
 
     def get_all_reservations(self) -> list[Type[Reservation]]:
@@ -47,17 +45,3 @@ class ReservationRepository:
             .filter(Reservation.user_id == user_id)
             .all()
         )
-
-    def save(self, obj):
-        self.db.add(obj)
-        self.db.flush()
-
-    def delete(self, obj):
-        self.db.delete(obj)
-        self.db.commit()
-
-    def commit(self):
-        self.db.commit()
-
-    def refresh(self, obj):
-        self.db.refresh(obj)
