@@ -4,10 +4,13 @@ from app.api import reservation, schedule
 from app.core.config import settings
 from app.core.database import Base, engine, SessionLocal
 from app.core.dummy import create_seed_data
+from app.docs.description import API_DESCRIPTION, TAGS_METADATA
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
+    description=API_DESCRIPTION,
+    openapi_tags=TAGS_METADATA,
 )
 
 
